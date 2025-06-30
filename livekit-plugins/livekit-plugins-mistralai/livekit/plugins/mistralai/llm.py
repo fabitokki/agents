@@ -26,6 +26,7 @@ from livekit.agents.utils import is_given
 from mistralai import (
     AssistantMessage,
     ChatCompletionChoice,
+    ChatCompletionStreamRequestMessages,
     Mistral,
     SystemMessage,
     UserMessage,
@@ -36,7 +37,7 @@ from .models import ChatModels
 
 def to_async_stream_mistral_format(
     chat_ctx: ChatContext,
-) -> list[AssistantMessage | UserMessage | SystemMessage]:
+) -> list[ChatCompletionStreamRequestMessages]:
     """
     Custom function to change livekit ChatContext Object to
     Mistral injectable AsyncStreaming Object (ChatCompletionStreamRequestMessages)
@@ -45,7 +46,7 @@ def to_async_stream_mistral_format(
         messages = chat_ctx.to_dict().get(
             "items", []
         )  # transform chatContext to dict for processing
-        messages_mistral: list[AssistantMessage | UserMessage | SystemMessage] = []
+        messages_mistral: list[ChatCompletionStreamRequestMessages] = []
         for element in messages:
             if element["role"] == "assistant":
                 content_list = element.get("content", [])
@@ -108,10 +109,10 @@ class MistralLLM(LLM):
         extra = {}
 
         if is_given(self._opts.max_completion_tokens):
-            extra["max_completion_tokens"] = int(self._opts.max_completion_tokens)
+            extra["max_completion_tokens"] = self._opts.max_completion_tokens
 
         if is_given(self._opts.temperature):
-            extra["temperature"] = float(self._opts.temperature)
+            extra["temperature"] = self._opts.temperature
 
         return MistralLLMStream(
             self,
@@ -119,6 +120,7 @@ class MistralLLM(LLM):
             client=self._client,
             chat_ctx=chat_ctx,
             provider_fmt=self._provider_fmt,
+            extra_kwargs=extra,
         )
 
 
@@ -134,6 +136,7 @@ class MistralLLMStream(LLMStream):
         chat_ctx: ChatContext,
         tools: list[FunctionTool | RawFunctionTool] | None = None,
         conn_options: APIConnectOptions = DEFAULT_API_CONNECT_OPTIONS,
+        extra_kwargs: dict[str, Any],
     ) -> None:
         if tools is None:
             tools = []
@@ -142,6 +145,7 @@ class MistralLLMStream(LLMStream):
         self._client = client
         self._llm = llm
         self._provider_fmt = provider_fmt
+        self._extra_kwargs = extra_kwargs
 
     async def _run(self) -> None:
         # current function call that we're waiting for full completion (args are streamed)
@@ -153,6 +157,7 @@ class MistralLLMStream(LLMStream):
             async_response = await self._client.chat.stream_async(
                 messages=messages_mistral,
                 model=self._model,
+                **self._extra_kwargs,
             )
             print("Streaming Start")
             async for chunk in async_response:
