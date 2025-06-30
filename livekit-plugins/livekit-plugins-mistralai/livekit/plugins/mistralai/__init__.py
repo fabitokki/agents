@@ -1,3 +1,5 @@
+"""LiveKit plugin for Mistral AI models. Currently only supports ChatModels"""
+
 from livekit.agents import Plugin
 
 from .log import logger
