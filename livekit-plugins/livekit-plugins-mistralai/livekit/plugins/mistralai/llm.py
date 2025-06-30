@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Any, Union
+from typing import Any, cast
 
 import httpx
 
@@ -23,14 +23,21 @@ from livekit.agents.types import (
     NotGivenOr,
 )
 from livekit.agents.utils import is_given
-from mistralai import AssistantMessage, ChatCompletionChoice, Mistral, SystemMessage, UserMessage
+from mistralai import (
+    AssistantMessage,
+    ChatCompletionChoice,
+    ChatCompletionStreamRequestMessages,
+    Mistral,
+    SystemMessage,
+    UserMessage,
+)
 
 from .models import ChatModels
 
 
 def to_async_stream_mistral_format(
     chat_ctx: ChatContext,
-) -> list[Union[AssistantMessage, UserMessage, SystemMessage]]:
+) -> list[AssistantMessage | UserMessage | SystemMessage]:
     """
     Custom function to change livekit ChatContext Object to
     Mistral injectable AsyncStreaming Object (ChatCompletionStreamRequestMessages)
@@ -39,22 +46,22 @@ def to_async_stream_mistral_format(
         messages = chat_ctx.to_dict().get(
             "items", []
         )  # transform chatContext to dict for processing
-        messages_mistral: list[Union[AssistantMessage, UserMessage, SystemMessage]] = []
+        messages_mistral: list[AssistantMessage | UserMessage | SystemMessage] = []
         for element in messages:
             if element["role"] == "assistant":
                 content_list = element.get("content", [])
-                if content_list:  # only include if there is content
+                if content_list and isinstance(content_list[0], str) and content_list[0].strip():
                     assistant_msg = AssistantMessage(content=content_list[0])
                     messages_mistral.append(assistant_msg)
             elif element["role"] == "user":
                 content_list = element.get("content", [])
-                if content_list:  # only include if there is content
-                    user_msg = UserMessage(content=element["content"][0])
+                if content_list and isinstance(content_list[0], str) and content_list[0].strip():
+                    user_msg = UserMessage(content=content_list[0])
                     messages_mistral.append(user_msg)
             elif element["role"] == "system":
                 content_list = element.get("content", [])
-                if content_list:  # only include if there is content
-                    system_msg = SystemMessage(content=element["content"][0])
+                if content_list and isinstance(content_list[0], str) and content_list[0].strip():
+                    system_msg = SystemMessage(content=content_list[0])
                     messages_mistral.append(system_msg)
 
     return messages_mistral
@@ -126,9 +133,11 @@ class MistralLLMStream(LLMStream):
         provider_fmt: str,
         client: Mistral,
         chat_ctx: ChatContext,
-        tools: list[FunctionTool | RawFunctionTool] = [],
+        tools: list[FunctionTool | RawFunctionTool] = None,
         conn_options: APIConnectOptions = DEFAULT_API_CONNECT_OPTIONS,
     ) -> None:
+        if tools is None:
+            tools = []
         super().__init__(llm, chat_ctx=chat_ctx, tools=tools, conn_options=conn_options)
         self._model = model
         self._client = client
@@ -141,9 +150,9 @@ class MistralLLMStream(LLMStream):
         retryable = True
 
         try:
-            messages = to_async_stream_mistral_format(chat_ctx=self._chat_ctx)
+            messages_mistral = to_async_stream_mistral_format(chat_ctx=self._chat_ctx)
             async_response = await self._client.chat.stream_async(
-                messages=messages,
+                messages=cast(ChatCompletionStreamRequestMessages, messages_mistral),
                 model=self._model,
             )
             print("Streaming Start")
