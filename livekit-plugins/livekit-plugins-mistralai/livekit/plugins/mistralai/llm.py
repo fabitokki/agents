@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Union
 
 import httpx
 
@@ -28,25 +28,34 @@ from mistralai import AssistantMessage, ChatCompletionChoice, Mistral, SystemMes
 from .models import ChatModels
 
 
-def to_async_stream_mistral_format(chat_ctx: ChatContext):
+def to_async_stream_mistral_format(
+    chat_ctx: ChatContext,
+) -> list[Union[AssistantMessage, UserMessage, SystemMessage]]:
     """
     Custom function to change livekit ChatContext Object to
     Mistral injectable AsyncStreaming Object (ChatCompletionStreamRequestMessages)
     """
     if isinstance(chat_ctx, ChatContext):
-        messages = chat_ctx.to_dict().get("items")  # transform chatContext to dict for processing
-        print("OK")
-        messages_mistral = []
+        messages = chat_ctx.to_dict().get(
+            "items", []
+        )  # transform chatContext to dict for processing
+        messages_mistral: list[Union[AssistantMessage, UserMessage, SystemMessage]] = []
         for element in messages:
             if element["role"] == "assistant":
-                assistant_msg = AssistantMessage(content=element["content"][0])
-                messages_mistral.append(assistant_msg)
+                content_list = element.get("content", [])
+                if content_list:  # only include if there is content
+                    assistant_msg = AssistantMessage(content=content_list[0])
+                    messages_mistral.append(assistant_msg)
             elif element["role"] == "user":
-                user_msg = UserMessage(content=element["content"][0])
-                messages_mistral.append(user_msg)
+                content_list = element.get("content", [])
+                if content_list:  # only include if there is content
+                    user_msg = UserMessage(content=element["content"][0])
+                    messages_mistral.append(user_msg)
             elif element["role"] == "system":
-                system_msg = SystemMessage(content=element["content"][0])
-                messages_mistral.append(system_msg)
+                content_list = element.get("content", [])
+                if content_list:  # only include if there is content
+                    system_msg = SystemMessage(content=element["content"][0])
+                    messages_mistral.append(system_msg)
 
     return messages_mistral
 
@@ -96,7 +105,7 @@ class MistralLLM(LLM):
             extra["max_completion_tokens"] = self._opts.max_completion_tokens
 
         if is_given(self._opts.temperature):
-            extra["temperature"] = self._opts.temperature
+            extra["temperature"] = float(self._opts.temperature)
 
         return MistralLLMStream(
             self,
@@ -117,7 +126,7 @@ class MistralLLMStream(LLMStream):
         provider_fmt: str,
         client: Mistral,
         chat_ctx: ChatContext,
-        tools: list[FunctionTool | RawFunctionTool] | None = None,
+        tools: list[FunctionTool | RawFunctionTool] = [],
         conn_options: APIConnectOptions = DEFAULT_API_CONNECT_OPTIONS,
     ) -> None:
         super().__init__(llm, chat_ctx=chat_ctx, tools=tools, conn_options=conn_options)
@@ -129,7 +138,6 @@ class MistralLLMStream(LLMStream):
     async def _run(self) -> None:
         # current function call that we're waiting for full completion (args are streamed)
         # (defined inside the _run method to make sure the state is reset for each run/attempt)
-        self._mai_stream: None = None
         retryable = True
 
         try:
@@ -160,30 +168,9 @@ class MistralLLMStream(LLMStream):
             raise APIConnectionError(retryable=retryable) from e
 
     def _parse_choice(self, id: str, choice: ChatCompletionChoice) -> ChatChunk | None:
-        delta = choice.delta
-
-        if delta is None:  # 1st case delta is None
-            return None
-
-        call_chunk = None
-
-        call_chunk = llm.ChatChunk(
-            id=id, delta=llm.ChoiceDelta(role="assistant", content=delta.content)
-        )
-
-        if call_chunk is not None:
-            return call_chunk
-
-        if choice.finish_reason == "stop":
-            call_chunk = llm.ChatChunk(
-                id=id, delta=llm.ChoiceDelta(role="assistant", content=delta.content)
-            )
-
-            return call_chunk
-
-        delta.content = llm_utils.strip_thinking_tokens(delta.content)
-
-        if not delta.content:
+        # 1) get the streaming delta
+        delta = getattr(choice, "delta", None)
+        if not (delta and delta.content):
             return None
 
         return llm.ChatChunk(
