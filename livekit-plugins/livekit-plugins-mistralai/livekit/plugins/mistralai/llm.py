@@ -106,7 +106,7 @@ class MistralLLM(LLM):
         response_format: NotGivenOr[type[llm_utils.ResponseFormatT]] = NOT_GIVEN,
         extra_kwargs: NotGivenOr[dict[str, Any]] = NOT_GIVEN,
     ) -> MistralLLMStream:
-        extra = {}
+        extra: dict[str, Any] = {}
 
         if is_given(self._opts.max_completion_tokens):
             extra["max_completion_tokens"] = self._opts.max_completion_tokens
