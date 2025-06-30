@@ -1628,6 +1628,9 @@ lmnt = [
 mcp = [
     { name = "mcp", marker = "python_full_version >= '3.10'" },
 ]
+mistralai = [
+    { name = "livekit-plugins-mistralai" },
+]
 neuphonic = [
     { name = "livekit-plugins-neuphonic" },
 ]
@@ -1668,6 +1671,7 @@ turn-detector = [
     { name = "livekit-plugins-turn-detector" },
 ]
 
+
 [package.metadata]
 requires-dist = [
     { name = "aiohttp", specifier = "~=3.10" },
@@ -1702,6 +1706,7 @@ requires-dist = [
     { name = "livekit-plugins-neuphonic", marker = "extra == 'neuphonic'", editable = "livekit-plugins/livekit-plugins-neuphonic" },
     { name = "livekit-plugins-nltk", marker = "extra == 'nltk'", editable = "livekit-plugins/livekit-plugins-nltk" },
     { name = "livekit-plugins-openai", marker = "extra == 'openai'", editable = "livekit-plugins/livekit-plugins-openai" },
+    { name = "livekit-plugins-mistralai", marker = "extra == 'mistralai'", editable = "livekit-plugins/livekit-plugins-mistralai" },
     { name = "livekit-plugins-playai", marker = "extra == 'playai'", editable = "livekit-plugins/livekit-plugins-playai" },
     { name = "livekit-plugins-resemble", marker = "extra == 'resemble'", editable = "livekit-plugins/livekit-plugins-resemble" },
     { name = "livekit-plugins-rime", marker = "extra == 'rime'", editable = "livekit-plugins/livekit-plugins-rime" },
