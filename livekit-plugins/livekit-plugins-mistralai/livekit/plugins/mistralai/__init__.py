@@ -5,11 +5,7 @@ from livekit.agents import Plugin
 from .log import logger
 from .version import __version__
 
-__all__ = [
-    "MistralLLM",
-    "MistralLLMStream",
-]
-
+__all__ = ["MistralLLM","MistralLLMStream","__version__"]
 
 class MistralAIPlugin(Plugin):
     def __init__(self) -> None:
