@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import Any
 
 import httpx
 
@@ -26,7 +26,6 @@ from livekit.agents.utils import is_given
 from mistralai import (
     AssistantMessage,
     ChatCompletionChoice,
-    ChatCompletionStreamRequestMessages,
     Mistral,
     SystemMessage,
     UserMessage,
@@ -109,7 +108,7 @@ class MistralLLM(LLM):
         extra = {}
 
         if is_given(self._opts.max_completion_tokens):
-            extra["max_completion_tokens"] = self._opts.max_completion_tokens
+            extra["max_completion_tokens"] = int(self._opts.max_completion_tokens)
 
         if is_given(self._opts.temperature):
             extra["temperature"] = float(self._opts.temperature)
@@ -133,7 +132,7 @@ class MistralLLMStream(LLMStream):
         provider_fmt: str,
         client: Mistral,
         chat_ctx: ChatContext,
-        tools: list[FunctionTool | RawFunctionTool] = None,
+        tools: list[FunctionTool | RawFunctionTool] | None = None,
         conn_options: APIConnectOptions = DEFAULT_API_CONNECT_OPTIONS,
     ) -> None:
         if tools is None:
@@ -152,7 +151,7 @@ class MistralLLMStream(LLMStream):
         try:
             messages_mistral = to_async_stream_mistral_format(chat_ctx=self._chat_ctx)
             async_response = await self._client.chat.stream_async(
-                messages=cast(ChatCompletionStreamRequestMessages, messages_mistral),
+                messages=messages_mistral,
                 model=self._model,
             )
             print("Streaming Start")
